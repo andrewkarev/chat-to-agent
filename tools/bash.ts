@@ -1,9 +1,18 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
+interface Command {
+  command: string;
+}
+
 interface BashOperations {
   exec(command: string): Promise<{ stdout: string; exitCode: number }>;
 }
+
+type ApprovalConfig =
+  | { mode: 'interactive' }
+  | { mode: 'background' }
+  | { mode: 'delegated'; trust: string[] };
 
 const SAFE_PREFIXES = [
   'ls',
@@ -19,6 +28,20 @@ const SAFE_PREFIXES = [
   'git status',
   'git diff',
 ];
+
+function createApproval(config: ApprovalConfig) {
+  return ({ command }: Command) => {
+    if (config.mode === 'background') {
+      return false;
+    }
+
+    if (config.mode === 'delegated') {
+      return !config.trust.some((p) => command.trim().startsWith(p));
+    }
+
+    return !SAFE_PREFIXES.some((p) => command.trim().startsWith(p));
+  };
+}
 
 const DESCRIPTION = `
   Execute a shell command in the working directory.
@@ -39,18 +62,17 @@ const DESCRIPTION = `
     - Check git status: command "git status"
     - Run a test suite: command "npm test"`;
 
-function isSafe(command: string, safePrefixes: string[]): boolean {
-  return safePrefixes.some((p) => command.trim().startsWith(p));
-}
-
-function createBashTool(operations: BashOperations, safePrefixes: string[]) {
+function createBashTool(
+  operations: BashOperations,
+  needsApproval: (input: Command) => boolean,
+) {
   return tool({
     description: DESCRIPTION,
     inputSchema: z.object({
       command: z.string().describe('Shell command to execute'),
     }),
     execute: async ({ command }) => {
-      if (!isSafe(command, safePrefixes)) {
+      if (needsApproval({ command })) {
         return `Blocked: "${command}" requires approval.`;
       }
 
@@ -94,4 +116,7 @@ const localOps: BashOperations = {
   },
 };
 
-export const bash = createBashTool(localOps, SAFE_PREFIXES);
+export const bash = createBashTool(
+  localOps,
+  createApproval({ mode: 'background' }),
+);
