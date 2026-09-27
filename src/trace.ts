@@ -24,6 +24,7 @@ function buildTrace(steps: StepResult<ToolSet>[]) {
     stepNumber: step.stepNumber,
     model: step.response.modelId,
     finishReason: step.finishReason,
+    rawFinishReason: step.rawFinishReason,
     content: step.content.map(buildTracePart),
   }));
 }

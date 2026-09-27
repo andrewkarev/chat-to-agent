@@ -8,7 +8,7 @@ const client = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-const DEFAULT_MODEL = 'qwen/qwen3.8-27b:free';
+const DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
 
 const MODELS = [
   'google/gemma-4-31b-it:free',
