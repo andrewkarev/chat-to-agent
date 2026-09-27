@@ -27,17 +27,23 @@ const model = client(DEFAULT_MODEL, {
 
 const cwd = process.argv[2] || process.cwd();
 
+const agentsFile = Bun.file(new URL('AGENTS.md', Bun.pathToFileURL(`${cwd}/`)));
+const projectContext = (await agentsFile.exists())
+  ? await agentsFile.text()
+  : undefined;
+
 const instructions = buildSystemPrompt({
   workingDirectory: cwd,
   sandboxType: 'local',
   toolNames: Object.keys(tools),
+  projectContext,
 });
 
 const agent = new ToolLoopAgent({
   model,
   instructions,
   tools,
-  stopWhen: stepCountIs(10),
+  stopWhen: stepCountIs(25),
 });
 
 const prompt = process.argv.slice(3).join(' ') || 'Hello!';
