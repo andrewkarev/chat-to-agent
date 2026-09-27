@@ -9,9 +9,9 @@ const client = createOpenRouter({
 const model = client('poolside/laguna-s-2.1:free', {
   extraBody: {
     models: [
-      'poolside/laguna-s-2.1:free',
-      'nex-agi/nex-n2.5-pro:free',
-      'inclusionai/ling-3.0-flash-vl:free',
+      'qwen/qwen3.8-27b:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'google/gemma-4-31b-it:free',
     ],
     provider: {
       allow_fallbacks: true,
@@ -106,10 +106,69 @@ EXAMPLES:
   },
 });
 
+const SAFE_PREFIXES = [
+  'ls',
+  'cat',
+  'echo',
+  'pwd',
+  'which',
+  'find',
+  'head',
+  'tail',
+  'wc',
+  'git log',
+  'git status',
+  'git diff',
+];
+
+function isSafe(command: string): boolean {
+  return SAFE_PREFIXES.some((p) => command.trim().startsWith(p));
+}
+
+const bash = tool({
+  description: `Execute a shell command in the working directory.
+WHEN TO USE: running build commands, installing packages, running tests,
+  git operations, directory listings.
+WHEN NOT TO USE: reading file contents (use read instead).
+  Searching for patterns (use grep instead).
+DO NOT USE FOR: reading files (use read), searching code (use grep).`,
+  inputSchema: z.object({
+    command: z.string().describe('Shell command to execute'),
+  }),
+  execute: async ({ command }) => {
+    if (!isSafe(command)) {
+      return `Blocked: "${command}" requires approval. Only safe commands (${SAFE_PREFIXES.join(', ')}) run automatically.`;
+    }
+
+    try {
+      const proc = Bun.spawn({
+        cmd: ['sh', '-c', command],
+        cwd,
+        stdout: 'pipe',
+        stderr: 'pipe',
+        timeout: 30_000,
+      });
+
+      const [stdout, stderr] = await Promise.all([
+        proc.stdout.text(),
+        proc.stderr.text(),
+      ]);
+      const exitCode = await proc.exited;
+
+      if (exitCode !== 0) {
+        return `Exit ${exitCode}: ${stdout || stderr}`;
+      }
+      return stdout || '(no output)';
+    } catch (e: any) {
+      return `Exit 1: ${e.message || ''}`;
+    }
+  },
+});
+
 const agent = new ToolLoopAgent({
   model,
   instructions: `You are a coding agent.\nWorking directory: ${cwd}`,
-  tools: { read, grep },
+  tools: { read, grep, bash },
   stopWhen: stepCountIs(10),
 });
 
@@ -118,6 +177,7 @@ const response = await agent.generate({ prompt });
 
 const trace = response.steps.map((step) => ({
   stepNumber: step.stepNumber,
+  model: step.response.modelId,
   finishReason: step.finishReason,
   content: step.content.map((part) => {
     switch (part.type) {
