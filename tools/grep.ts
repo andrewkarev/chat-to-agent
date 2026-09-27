@@ -1,16 +1,29 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
+const DESCRIPTION = `
+  Search file contents using regex. Returns matching lines with file paths.
+
+  WHEN TO USE: finding patterns across multiple files, locating function definitions,
+    searching for imports, finding TODOs or error messages.
+
+  WHEN NOT TO USE: reading a known file (use read instead).
+    Running commands (use bash instead).
+
+  DO NOT USE FOR: reading files (use read), listing directories (use bash),
+    modifying files (use edit).
+
+  USAGE: pattern is a regex string. glob filters by file extension.
+    Results are capped at 50 matches.
+
+  EXAMPLES:
+    - Find all TODO comments: pattern "TODO" glob "*.ts"
+    - Find function definitions: pattern "function \\w+" glob "*.ts"
+    - Find imports of a package: pattern "from 'express'" glob "*.ts"`;
+
 export const createGrepTool = (cwd: string) =>
   tool({
-    description: `Search file contents using regex. Returns matching lines with file paths.
-WHEN TO USE: finding patterns across multiple files, locating function definitions,
-  searching for imports, finding TODOs or error messages.
-WHEN NOT TO USE: reading a known file (use read instead).
-DO NOT USE FOR: running commands, listing directories.
-EXAMPLES:
-  - Find all TODO comments: pattern "TODO" glob "*.ts"
-  - Find function definitions: pattern "function \\\\w+" glob "*.ts"`,
+    description: DESCRIPTION,
     inputSchema: z.object({
       pattern: z.string().describe('Regex pattern to search for'),
       path: z

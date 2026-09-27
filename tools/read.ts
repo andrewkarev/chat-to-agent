@@ -1,12 +1,24 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
+const DESCRIPTION = `
+  Read a file from the project. Returns numbered lines.
+  
+  WHEN TO USE: viewing file contents, checking configurations, reading source code,
+    examining specific lines with offset/limit.
+  
+  WHEN NOT TO USE: searching for patterns across files (use grep instead).
+    Running commands (use bash instead).
+  
+  DO NOT USE FOR: searching code (use grep), executing commands (use bash),
+    modifying files (use edit or write).
+  
+  USAGE: path is relative to working directory. offset and limit are optional.
+    Output is capped at 500 lines.`;
+
 export const createReadTool = (cwd: string) =>
   tool({
-    description: `Read a file from the project. Returns numbered lines.
-WHEN TO USE: viewing file contents, checking configs, reading source code.
-WHEN NOT TO USE: searching across files (use grep instead).
-DO NOT USE FOR: running commands, listing directories.`,
+    description: DESCRIPTION,
     inputSchema: z.object({
       path: z.string().describe('File path relative to working directory'),
       offset: z.number().optional().describe('Start line (1-indexed)'),
