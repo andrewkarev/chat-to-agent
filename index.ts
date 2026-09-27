@@ -1,6 +1,6 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { ToolLoopAgent, stepCountIs } from 'ai';
-import { createTools } from './tools';
+import { tools } from './tools';
 
 const client = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -28,7 +28,7 @@ const cwd = process.argv[2] || process.cwd();
 const agent = new ToolLoopAgent({
   model,
   instructions: `You are a coding agent.\nWorking directory: ${cwd}`,
-  tools: createTools(cwd),
+  tools,
   stopWhen: stepCountIs(10),
 });
 

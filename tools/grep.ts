@@ -21,7 +21,7 @@ const DESCRIPTION = `
     - Find function definitions: pattern "function \\w+" glob "*.ts"
     - Find imports of a package: pattern "from 'express'" glob "*.ts"`;
 
-export const createGrepTool = (cwd: string) =>
+const createGrepTool = (cwd: string) =>
   tool({
     description: DESCRIPTION,
     inputSchema: z.object({
@@ -67,3 +67,7 @@ export const createGrepTool = (cwd: string) =>
         : result.join('\n') || 'No matches found.';
     },
   });
+
+const cwd = process.argv[2] || process.cwd();
+
+export const grep = createGrepTool(cwd);

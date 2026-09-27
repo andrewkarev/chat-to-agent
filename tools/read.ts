@@ -16,7 +16,7 @@ const DESCRIPTION = `
   USAGE: path is relative to working directory. offset and limit are optional.
     Output is capped at 500 lines.`;
 
-export const createReadTool = (cwd: string) =>
+const createReadTool = (cwd: string) =>
   tool({
     description: DESCRIPTION,
     inputSchema: z.object({
@@ -45,3 +45,7 @@ export const createReadTool = (cwd: string) =>
         : numbered.join('\n');
     },
   });
+
+const cwd = process.argv[2] || process.cwd();
+
+export const read = createReadTool(cwd);

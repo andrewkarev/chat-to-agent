@@ -1,9 +1,9 @@
-import { createBashTool } from './bash';
-import { createGrepTool } from './grep';
-import { createReadTool } from './read';
+import { grep } from './grep';
+import { read } from './read';
+import { bash } from './bash';
 
-export const createTools = (cwd: string) => ({
-  read: createReadTool(cwd),
-  grep: createGrepTool(cwd),
-  bash: createBashTool(cwd),
-});
+export const tools = {
+  read,
+  grep,
+  bash,
+};
