@@ -1,9 +1,3 @@
-import { grep } from './grep';
-import { read } from './read';
-import { bash } from './bash';
-
-export const tools = {
-  read,
-  grep,
-  bash,
-};
+export { createGrepTool } from './grep';
+export { createReadTool } from './read';
+export { createBashTool, createApproval } from './bash';

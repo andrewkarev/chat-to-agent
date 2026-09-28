@@ -1,5 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import type { Sandbox } from '../sandbox';
 
 const DESCRIPTION = `
   Search file contents using regex. Returns matching lines with file paths.
@@ -14,15 +15,19 @@ const DESCRIPTION = `
     modifying files (use edit).
 
   USAGE: pattern is a regex string. glob filters by file extension.
-    Results are capped at 50 matches.
+    Results are capped at 50 matches. Files ignored by .gitignore
+    (e.g. node_modules) and hidden files are skipped.
 
   EXAMPLES:
     - Find all TODO comments: pattern "TODO" glob "*.ts"
     - Find function definitions: pattern "function \\w+" glob "*.ts"
-    - Find imports of a package: pattern "from 'express'" glob "*.ts"`;
+    - Find imports of a package: pattern "from 'express'" glob "*.ts"
+  `;
 
-const createGrepTool = (cwd: string) =>
-  tool({
+const filePath = (line: string) => line.match(/^(.*?):\d+:/)?.[1] ?? line;
+
+export function createGrepTool(sandbox: Sandbox) {
+  return tool({
     description: DESCRIPTION,
     inputSchema: z.object({
       pattern: z.string().describe('Regex pattern to search for'),
@@ -33,30 +38,29 @@ const createGrepTool = (cwd: string) =>
       glob: z.string().optional().describe("File glob filter, e.g. '*.ts'"),
     }),
     execute: async ({ pattern, path: searchPath, glob: globFilter }) => {
-      const dir = Bun.fileURLToPath(
-        new URL(searchPath || '.', Bun.pathToFileURL(`${cwd}/`)),
-      );
+      const { stdout, exitCode } = await sandbox.exec([
+        sandbox.bin.rg,
+        '--line-number',
+        '--with-filename',
+        '--color=never',
+        ...(globFilter ? ['--glob', globFilter] : []),
+        '-e',
+        pattern,
+        '--',
+        searchPath || '.',
+      ]);
 
-      const proc = Bun.spawn({
-        cmd: [
-          'grep',
-          '-rn',
-          '--exclude-dir=node_modules',
-          '--exclude-dir=.git',
-          `--include=${globFilter || '*'}`,
-          '-E',
-          pattern,
-          dir,
-        ],
-        stdout: 'pipe',
-        stderr: 'ignore',
-        timeout: 10_000,
-      });
+      // rg: 0 = matches, 1 = no matches, 2 = error (bad regex, missing path)
+      if (exitCode === 2) {
+        return `Error: ${stdout.trim()}`;
+      }
 
-      const stdout = await proc.stdout.text();
-      await proc.exited;
-
-      const lines = stdout.trim().split('\n').filter(Boolean);
+      const lines = stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.replace(/^\.\//, ''))
+        .sort((a, b) => filePath(a).localeCompare(filePath(b)));
       const MAX_MATCHES = 50;
       const truncated = lines.length > MAX_MATCHES;
       const result = truncated ? lines.slice(0, MAX_MATCHES) : lines;
@@ -67,7 +71,4 @@ const createGrepTool = (cwd: string) =>
         : result.join('\n') || 'No matches found.';
     },
   });
-
-const cwd = process.argv[2] || process.cwd();
-
-export const grep = createGrepTool(cwd);
+}

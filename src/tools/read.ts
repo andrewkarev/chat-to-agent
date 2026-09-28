@@ -1,5 +1,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import type { Sandbox } from '../sandbox';
 
 const DESCRIPTION = `
   Read a file from the project. Returns numbered lines.
@@ -14,10 +15,11 @@ const DESCRIPTION = `
     modifying files (use edit or write).
   
   USAGE: path is relative to working directory. offset and limit are optional.
-    Output is capped at 500 lines.`;
+    Output is capped at 500 lines.
+  `;
 
-const createReadTool = (cwd: string) =>
-  tool({
+export function createReadTool(sandbox: Sandbox) {
+  return tool({
     description: DESCRIPTION,
     inputSchema: z.object({
       path: z.string().describe('File path relative to working directory'),
@@ -25,8 +27,7 @@ const createReadTool = (cwd: string) =>
       limit: z.number().optional().describe('Max lines to return'),
     }),
     execute: async ({ path: filePath, offset, limit }) => {
-      const file = Bun.file(new URL(filePath, Bun.pathToFileURL(`${cwd}/`)));
-      const content = await file.text();
+      const content = await sandbox.readFile(filePath);
 
       let lines = content.split('\n');
 
@@ -45,7 +46,4 @@ const createReadTool = (cwd: string) =>
         : numbered.join('\n');
     },
   });
-
-const cwd = process.argv[2] || process.cwd();
-
-export const read = createReadTool(cwd);
+}

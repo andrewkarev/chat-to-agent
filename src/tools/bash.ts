@@ -1,12 +1,9 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import type { Sandbox } from '../sandbox';
 
 interface Command {
   command: string;
-}
-
-interface BashOperations {
-  exec(command: string): Promise<{ stdout: string; exitCode: number }>;
 }
 
 type ApprovalConfig =
@@ -29,20 +26,6 @@ const SAFE_PREFIXES = [
   'git diff',
 ];
 
-function createApproval(config: ApprovalConfig) {
-  return ({ command }: Command) => {
-    if (config.mode === 'background') {
-      return false;
-    }
-
-    if (config.mode === 'delegated') {
-      return !config.trust.some((p) => command.trim().startsWith(p));
-    }
-
-    return !SAFE_PREFIXES.some((p) => command.trim().startsWith(p));
-  };
-}
-
 const DESCRIPTION = `
   Execute a shell command in the working directory.
   
@@ -60,10 +43,11 @@ const DESCRIPTION = `
   EXAMPLES:
     - List files: command "ls -la"
     - Check git status: command "git status"
-    - Run a test suite: command "npm test"`;
+    - Run a test suite: command "npm test"
+  `;
 
-function createBashTool(
-  operations: BashOperations,
+export function createBashTool(
+  sandbox: Sandbox,
   needsApproval: (input: Command) => boolean,
 ) {
   return tool({
@@ -76,47 +60,23 @@ function createBashTool(
         return `Blocked: "${command}" requires approval.`;
       }
 
-      const { stdout } = await operations.exec(command);
+      const { stdout } = await sandbox.exec(command);
 
       return stdout || '(no output)';
     },
   });
 }
 
-const localOps: BashOperations = {
-  exec: async (command) => {
-    try {
-      const cwd = process.argv[2] || process.cwd();
-
-      const proc = Bun.spawn({
-        cmd: ['sh', '-c', command],
-        cwd,
-        stdout: 'pipe',
-        stderr: 'pipe',
-        timeout: 30_000,
-      });
-
-      const [stdout, stderr] = await Promise.all([
-        proc.stdout.text(),
-        proc.stderr.text(),
-      ]);
-
-      const exitCode = await proc.exited;
-
-      return {
-        stdout: stdout || stderr,
-        exitCode,
-      };
-    } catch (e: any) {
-      return {
-        stdout: e.stdout || e.stderr || e.message || '',
-        exitCode: e.status ?? 1,
-      };
+export function createApproval(config: ApprovalConfig) {
+  return ({ command }: Command) => {
+    if (config.mode === 'background') {
+      return false;
     }
-  },
-};
 
-export const bash = createBashTool(
-  localOps,
-  createApproval({ mode: 'background' }),
-);
+    if (config.mode === 'delegated') {
+      return !config.trust.some((p) => command.trim().startsWith(p));
+    }
+
+    return !SAFE_PREFIXES.some((p) => command.trim().startsWith(p));
+  };
+}

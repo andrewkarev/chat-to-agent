@@ -1,8 +1,25 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { ToolLoopAgent, stepCountIs } from 'ai';
-import { tools } from './src/tools';
 import { buildSystemPrompt } from './src/system';
 import { writeTrace } from './src/trace';
+import { createLocalSandbox } from './src/sandbox-local';
+import {
+  createBashTool,
+  createApproval,
+  createReadTool,
+  createGrepTool,
+} from './src/tools';
+
+const cwd = process.argv[2] || process.cwd();
+
+const sandbox = createLocalSandbox(cwd);
+console.info(`Sandbox: ${sandbox.type}\n`);
+
+const tools = {
+  read: createReadTool(sandbox),
+  grep: createGrepTool(sandbox),
+  bash: createBashTool(sandbox, createApproval({ mode: 'interactive' })),
+};
 
 const client = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -24,8 +41,6 @@ const model = client(DEFAULT_MODEL, {
     },
   },
 });
-
-const cwd = process.argv[2] || process.cwd();
 
 const agentsFile = Bun.file(new URL('AGENTS.md', Bun.pathToFileURL(`${cwd}/`)));
 const projectContext = (await agentsFile.exists())
