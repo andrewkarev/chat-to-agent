@@ -2,24 +2,22 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { ToolLoopAgent, stepCountIs } from 'ai';
 import { buildSystemPrompt } from './src/system';
 import { writeTrace } from './src/trace';
-import { createLocalSandbox } from './src/sandbox-local';
-import { createJustBashSandbox } from './src/sandbox-just-bash';
 import {
   createBashTool,
   createApproval,
   createReadTool,
   createGrepTool,
 } from './src/tools';
+import { createSandbox } from './src/create-sandbox';
+import { createLifecycle } from './src/create-lifecycle';
 
 const cwd = process.argv[2] || process.cwd();
 const sandboxType = process.env.SANDBOX || 'local';
 
-const sandbox =
-  sandboxType === 'just-bash'
-    ? await createJustBashSandbox(cwd)
-    : createLocalSandbox(cwd);
+const lifecycle = createLifecycle();
+const sandbox = await createSandbox(sandboxType, cwd);
 
-console.info(`Sandbox: ${sandbox.type}\n`);
+await lifecycle.afterStart?.(sandbox);
 
 const tools = {
   read: createReadTool(sandbox),
@@ -67,9 +65,15 @@ const agent = new ToolLoopAgent({
 });
 
 const prompt = process.argv.slice(3).join(' ') || 'Hello!';
-const response = await agent.generate({ prompt });
 
-await writeTrace('response.json', instructions, response.steps);
+try {
+  const response = await agent.generate({ prompt });
 
-console.log(response.text);
-console.log(`\n(${response.steps.length} steps)`);
+  await writeTrace('response.json', instructions, response.steps);
+
+  console.log(response.text);
+  console.log(`\n(${response.steps.length} steps)`);
+} finally {
+  await lifecycle.beforeStop?.(sandbox);
+  await sandbox.stop();
+}
