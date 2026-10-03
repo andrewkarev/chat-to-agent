@@ -42,12 +42,10 @@ export function createGrepTool(sandbox: Sandbox) {
         sandbox.bin.rg,
         '--line-number',
         '--with-filename',
-        '--color=never',
         ...(globFilter ? ['--glob', globFilter] : []),
         '-e',
         pattern,
-        '--',
-        searchPath || '.',
+        searchPath?.startsWith('-') ? `./${searchPath}` : searchPath || '.',
       ]);
 
       // rg: 0 = matches, 1 = no matches, 2 = error (bad regex, missing path)

@@ -3,6 +3,7 @@ import { ToolLoopAgent, stepCountIs } from 'ai';
 import { buildSystemPrompt } from './src/system';
 import { writeTrace } from './src/trace';
 import { createLocalSandbox } from './src/sandbox-local';
+import { createJustBashSandbox } from './src/sandbox-just-bash';
 import {
   createBashTool,
   createApproval,
@@ -11,8 +12,13 @@ import {
 } from './src/tools';
 
 const cwd = process.argv[2] || process.cwd();
+const sandboxType = process.env.SANDBOX || 'local';
 
-const sandbox = createLocalSandbox(cwd);
+const sandbox =
+  sandboxType === 'just-bash'
+    ? await createJustBashSandbox(cwd)
+    : createLocalSandbox(cwd);
+
 console.info(`Sandbox: ${sandbox.type}\n`);
 
 const tools = {
@@ -42,14 +48,13 @@ const model = client(DEFAULT_MODEL, {
   },
 });
 
-const agentsFile = Bun.file(new URL('AGENTS.md', Bun.pathToFileURL(`${cwd}/`)));
-const projectContext = (await agentsFile.exists())
-  ? await agentsFile.text()
-  : undefined;
+const projectContext = await sandbox
+  .readFile('AGENTS.md')
+  .catch(() => undefined);
 
 const instructions = buildSystemPrompt({
-  workingDirectory: cwd,
-  sandboxType: 'local',
+  workingDirectory: sandbox.workingDirectory,
+  sandboxType: sandbox.type,
   toolNames: Object.keys(tools),
   projectContext,
 });
