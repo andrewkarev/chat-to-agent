@@ -1,8 +1,16 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Sandbox } from '../sandbox';
+import { resolveCap } from './caps';
 
-const DESCRIPTION = `
+export type ReadCaps = { maxLines?: number };
+
+const DEFAULT_READ_CAPS = {
+  fallback: 500,
+  max: 2000,
+};
+
+const description = (maxLines: number) => `
   Read a file from the project. Returns numbered lines.
   
   WHEN TO USE: viewing file contents, checking configurations, reading source code,
@@ -15,12 +23,14 @@ const DESCRIPTION = `
     modifying files (use edit or write).
   
   USAGE: path is relative to working directory. offset and limit are optional.
-    Output is capped at 500 lines.
+    Output is capped at ${maxLines} lines.
   `;
 
-export function createReadTool(sandbox: Sandbox) {
+export function createReadTool(sandbox: Sandbox, caps: ReadCaps = {}) {
+  const maxLines = resolveCap('maxLines', caps.maxLines, DEFAULT_READ_CAPS);
+
   return tool({
-    description: DESCRIPTION,
+    description: description(maxLines),
     inputSchema: z.object({
       path: z.string().describe('File path relative to working directory'),
       offset: z.number().optional().describe('Start line (1-indexed)'),
@@ -31,18 +41,24 @@ export function createReadTool(sandbox: Sandbox) {
 
       let lines = content.split('\n');
 
-      if (offset) lines = lines.slice(offset - 1);
-      if (limit) lines = lines.slice(0, limit);
+      if (offset) {
+        lines = lines.slice(offset - 1);
+      }
 
-      const MAX_LINES = 500;
-      const truncated = lines.length > MAX_LINES;
+      if (limit) {
+        lines = lines.slice(0, limit);
+      }
 
-      if (truncated) lines = lines.slice(0, MAX_LINES);
+      const truncated = lines.length > maxLines;
+
+      if (truncated) {
+        lines = lines.slice(0, maxLines);
+      }
 
       const numbered = lines.map((l, i) => `${(offset || 1) + i}: ${l}`);
 
       return truncated
-        ? numbered.join('\n') + `\n... (truncated at ${MAX_LINES} lines)`
+        ? numbered.join('\n') + `\n... (truncated at ${maxLines} lines)`
         : numbered.join('\n');
     },
   });

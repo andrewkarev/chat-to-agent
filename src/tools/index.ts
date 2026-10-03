@@ -1,3 +1,3 @@
-export { createGrepTool } from './grep';
-export { createReadTool } from './read';
-export { createBashTool, createApproval } from './bash';
+export { createGrepTool, type GrepCaps } from './grep';
+export { createReadTool, type ReadCaps } from './read';
+export { createBashTool, createApproval, type BashCaps } from './bash';

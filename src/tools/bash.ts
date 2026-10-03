@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Sandbox } from '../sandbox';
+import { resolveCap } from './caps';
 
 interface Command {
   command: string;
@@ -11,8 +12,12 @@ type ApprovalConfig =
   | { mode: 'background' }
   | { mode: 'delegated'; trust: string[] };
 
-const MAX_BASH_CHARS = 5000;
-const OUTPUT_TRUNCATION_MESSAGE = `\n... (truncated, showing last ${MAX_BASH_CHARS} chars)`;
+export type BashCaps = { maxChars?: number };
+
+const DEFAULT_BASH_CAPS = {
+  fallback: 5000,
+  max: 50000,
+};
 
 const SAFE_PREFIXES = [
   'ls',
@@ -52,7 +57,10 @@ const DESCRIPTION = `
 export function createBashTool(
   sandbox: Sandbox,
   needsApproval: (input: Command) => boolean,
+  caps: BashCaps = {},
 ) {
+  const maxChars = resolveCap('maxChars', caps.maxChars, DEFAULT_BASH_CAPS);
+
   return tool({
     description: DESCRIPTION,
     inputSchema: z.object({
@@ -67,7 +75,7 @@ export function createBashTool(
 
       const stdout = result.stdout || '(no output)';
 
-      return truncateOutput(stdout, MAX_BASH_CHARS);
+      return truncateOutput(stdout, maxChars);
     },
   });
 }
@@ -86,8 +94,9 @@ export function createApproval(config: ApprovalConfig) {
   };
 }
 
-function truncateOutput(output: string, maxChars: number = MAX_BASH_CHARS) {
+function truncateOutput(output: string, maxChars: number) {
   return output.length > maxChars
-    ? output.slice(-maxChars) + OUTPUT_TRUNCATION_MESSAGE
+    ? output.slice(-maxChars) +
+        `\n... (truncated, showing last ${maxChars} chars)`
     : output;
 }

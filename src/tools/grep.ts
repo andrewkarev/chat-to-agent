@@ -1,10 +1,16 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Sandbox } from '../sandbox';
+import { resolveCap } from './caps';
 
-const MAX_MATCHES = 50;
+export type GrepCaps = { maxMatches?: number };
 
-const DESCRIPTION = `
+const DEFAULT_GREP_CAPS = {
+  fallback: 50,
+  max: 500,
+};
+
+const description = (maxMatches: number) => `
   Search file contents using regex. Returns matching lines with file paths.
 
   WHEN TO USE: finding patterns across multiple files, locating function definitions,
@@ -17,7 +23,7 @@ const DESCRIPTION = `
     modifying files (use edit).
 
   USAGE: pattern is a regex string. glob filters by file extension.
-    Results are capped at 50 matches. Files ignored by .gitignore
+    Results are capped at ${maxMatches} matches. Files ignored by .gitignore
     (e.g. node_modules) and hidden files are skipped.
 
   EXAMPLES:
@@ -28,9 +34,15 @@ const DESCRIPTION = `
 
 const filePath = (line: string) => line.match(/^(.*?):\d+:/)?.[1] ?? line;
 
-export function createGrepTool(sandbox: Sandbox) {
+export function createGrepTool(sandbox: Sandbox, caps: GrepCaps = {}) {
+  const maxMatches = resolveCap(
+    'maxMatches',
+    caps.maxMatches,
+    DEFAULT_GREP_CAPS,
+  );
+
   return tool({
-    description: DESCRIPTION,
+    description: description(maxMatches),
     inputSchema: z.object({
       pattern: z.string().describe('Regex pattern to search for'),
       path: z
@@ -61,17 +73,15 @@ export function createGrepTool(sandbox: Sandbox) {
         .filter(Boolean)
         .map((line) => line.replace(/^\.\//, ''))
         .sort((a, b) => filePath(a).localeCompare(filePath(b)));
-      const truncated = lines.length > MAX_MATCHES;
-      const result = truncated ? lines.slice(0, MAX_MATCHES) : lines;
 
-      return truncateMatches(result, MAX_MATCHES);
+      return truncateMatches(lines, maxMatches);
     },
   });
 }
 
-function truncateMatches(matches: string[], maxMatches: number = MAX_MATCHES) {
+function truncateMatches(matches: string[], maxMatches: number) {
   return matches.length > maxMatches
-    ? matches.slice(0, maxMatches) +
+    ? matches.slice(0, maxMatches).join('\n') +
         `\n... (${matches.length} total, showing first ${maxMatches})`
     : matches.join('\n') || 'No matches found.';
 }
