@@ -1,5 +1,5 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { ToolLoopAgent, stepCountIs } from 'ai';
+import { ToolLoopAgent, stepCountIs, pruneMessages } from 'ai';
 import { buildSystemPrompt } from './src/system';
 import { writeTrace } from './src/trace';
 import {
@@ -73,6 +73,12 @@ const agent = new ToolLoopAgent({
       outputTokens: s.usage.outputTokens,
     });
   },
+  prepareStep: async ({ messages, stepNumber }) => ({
+    messages: pruneMessages({
+      messages,
+      toolCalls: 'before-last-message',
+    }),
+  }),
   stopWhen: stepCountIs(25),
 });
 
