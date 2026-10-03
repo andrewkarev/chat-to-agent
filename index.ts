@@ -10,6 +10,7 @@ import {
 } from './src/tools';
 import { createSandbox } from './src/create-sandbox';
 import { createLifecycle } from './src/create-lifecycle';
+import { appendUsage } from './src/usage-csv';
 
 const cwd = process.argv[2] || process.cwd();
 const sandboxType = process.env.SANDBOX || 'local';
@@ -61,6 +62,17 @@ const agent = new ToolLoopAgent({
   model,
   instructions,
   tools,
+  onStepFinish: (s) => {
+    console.info(
+      `[step ${s.stepNumber}]: ${s.usage.inputTokens} input, ${s.usage.outputTokens} output`,
+    );
+    return appendUsage('usage.csv', {
+      callId: s.callId,
+      stepNumber: s.stepNumber,
+      inputTokens: s.usage.inputTokens,
+      outputTokens: s.usage.outputTokens,
+    });
+  },
   stopWhen: stepCountIs(25),
 });
 
