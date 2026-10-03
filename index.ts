@@ -73,7 +73,7 @@ const agent = new ToolLoopAgent({
       outputTokens: s.usage.outputTokens,
     });
   },
-  prepareStep: async ({ messages, stepNumber }) => ({
+  prepareStep: async ({ messages }) => ({
     messages: pruneMessages({
       messages,
       toolCalls: 'before-last-message',

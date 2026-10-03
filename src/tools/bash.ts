@@ -11,6 +11,9 @@ type ApprovalConfig =
   | { mode: 'background' }
   | { mode: 'delegated'; trust: string[] };
 
+const MAX_BASH_CHARS = 5000;
+const OUTPUT_TRUNCATION_MESSAGE = `\n... (truncated, showing last ${MAX_BASH_CHARS} chars)`;
+
 const SAFE_PREFIXES = [
   'ls',
   'cat',
@@ -60,9 +63,11 @@ export function createBashTool(
         return `Blocked: "${command}" requires approval.`;
       }
 
-      const { stdout } = await sandbox.exec(command);
+      const result = await sandbox.exec(command);
 
-      return stdout || '(no output)';
+      const stdout = result.stdout || '(no output)';
+
+      return truncateOutput(stdout, MAX_BASH_CHARS);
     },
   });
 }
@@ -79,4 +84,10 @@ export function createApproval(config: ApprovalConfig) {
 
     return !SAFE_PREFIXES.some((p) => command.trim().startsWith(p));
   };
+}
+
+function truncateOutput(output: string, maxChars: number = MAX_BASH_CHARS) {
+  return output.length > maxChars
+    ? output.slice(-maxChars) + OUTPUT_TRUNCATION_MESSAGE
+    : output;
 }

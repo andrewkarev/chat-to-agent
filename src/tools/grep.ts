@@ -2,6 +2,8 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import type { Sandbox } from '../sandbox';
 
+const MAX_MATCHES = 50;
+
 const DESCRIPTION = `
   Search file contents using regex. Returns matching lines with file paths.
 
@@ -59,14 +61,17 @@ export function createGrepTool(sandbox: Sandbox) {
         .filter(Boolean)
         .map((line) => line.replace(/^\.\//, ''))
         .sort((a, b) => filePath(a).localeCompare(filePath(b)));
-      const MAX_MATCHES = 50;
       const truncated = lines.length > MAX_MATCHES;
       const result = truncated ? lines.slice(0, MAX_MATCHES) : lines;
 
-      return truncated
-        ? result.join('\n') +
-            `\n... (${lines.length} total, showing first ${MAX_MATCHES})`
-        : result.join('\n') || 'No matches found.';
+      return truncateMatches(result, MAX_MATCHES);
     },
   });
+}
+
+function truncateMatches(matches: string[], maxMatches: number = MAX_MATCHES) {
+  return matches.length > maxMatches
+    ? matches.slice(0, maxMatches) +
+        `\n... (${matches.length} total, showing first ${maxMatches})`
+    : matches.join('\n') || 'No matches found.';
 }
