@@ -7,10 +7,11 @@ import {
   createApproval,
   createReadTool,
   createGrepTool,
+  createTaskTool,
 } from './src/tools';
 import { createSandbox } from './src/create-sandbox';
 import { createLifecycle } from './src/create-lifecycle';
-import { appendUsage } from './src/usage-csv';
+import { appendUsage, prepareUsageData } from './src/usage-csv';
 
 const cwd = process.argv[2] || process.cwd();
 const sandboxType = process.env.SANDBOX || 'local';
@@ -20,17 +21,12 @@ const sandbox = await createSandbox(sandboxType, cwd);
 
 await lifecycle.afterStart?.(sandbox);
 
-const tools = {
-  read: createReadTool(sandbox),
-  grep: createGrepTool(sandbox),
-  bash: createBashTool(sandbox, createApproval({ mode: 'interactive' })),
-};
-
 const client = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 const DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
+const SUBAGENT_MODEL = 'inclusionai/ling-3.0-flash-vl';
 
 const MODELS = [
   'google/gemma-4-31b-it:free',
@@ -47,9 +43,33 @@ const model = client(DEFAULT_MODEL, {
   },
 });
 
+const subagentModel = client(SUBAGENT_MODEL, {
+  extraBody: {
+    models: MODELS,
+    provider: {
+      allow_fallbacks: true,
+    },
+  },
+});
+
 const projectContext = await sandbox
   .readFile('AGENTS.md')
   .catch(() => undefined);
+
+const tools = {
+  read: createReadTool(sandbox),
+  grep: createGrepTool(sandbox),
+  bash: createBashTool(sandbox, createApproval({ mode: 'interactive' })),
+};
+
+const toolsWithTask = {
+  ...tools,
+  task: createTaskTool(
+    sandbox,
+    { read: tools.read, grep: tools.grep },
+    subagentModel,
+  ),
+};
 
 const instructions = buildSystemPrompt({
   workingDirectory: sandbox.workingDirectory,
@@ -61,22 +81,12 @@ const instructions = buildSystemPrompt({
 const agent = new ToolLoopAgent({
   model,
   instructions,
-  tools,
-  onStepFinish: (s) => {
-    console.info(
-      `[step ${s.stepNumber}]: ${s.usage.inputTokens} input, ${s.usage.outputTokens} output`,
-    );
-    return appendUsage('usage.csv', {
-      callId: s.callId,
-      stepNumber: s.stepNumber,
-      inputTokens: s.usage.inputTokens,
-      outputTokens: s.usage.outputTokens,
-    });
-  },
+  tools: toolsWithTask,
+  onStepFinish: (s) => appendUsage('usage.csv', prepareUsageData(s)),
   prepareStep: async ({ messages }) => ({
     messages: pruneMessages({
       messages,
-      toolCalls: 'before-last-message',
+      toolCalls: 'none',
     }),
   }),
   stopWhen: stepCountIs(25),
