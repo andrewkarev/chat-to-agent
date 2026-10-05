@@ -74,7 +74,7 @@ const toolsWithTask = {
 const instructions = buildSystemPrompt({
   workingDirectory: sandbox.workingDirectory,
   sandboxType: sandbox.type,
-  toolNames: Object.keys(tools),
+  toolNames: Object.keys(toolsWithTask),
   projectContext,
 });
 

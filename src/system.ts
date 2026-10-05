@@ -33,6 +33,18 @@ export function buildSystemPrompt(ctx: PromptContext): string {
 
   sections.push(withLineBreaks(agency));
 
+  if (ctx.toolNames.includes('task')) {
+    sections.push(
+      withLineBreaks([
+        '# Delegation',
+        '- For broad questions that span several parts of the codebase, use `task` and investigate the parts in parallel in one call.',
+        '- For a narrow lookup (one file, one symbol), use `read` or `grep` directly.',
+        '- Treat subagent reports as leads: verify key claims with `read` before relying on them.',
+        '- Synthesize the reports into one answer and resolve conflicts between them.',
+      ]),
+    );
+  }
+
   sections.push(
     withLineBreaks([
       '# Guardrails',
